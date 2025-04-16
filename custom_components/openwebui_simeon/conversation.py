@@ -198,7 +198,7 @@ class OpenWebUIAgent(
 
         # Auto-listen if the assistant ends with a question
         if response_data.strip().endswith("?"):
-            intent_response.response_type = intent.IntentResponseType.ASK
+            intent_response.expect_response = True
 
         return conversation.ConversationResult(
             response=intent_response,
