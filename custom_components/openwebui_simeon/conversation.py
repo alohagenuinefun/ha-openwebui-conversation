@@ -235,9 +235,9 @@ async def query(self, prompt: str, history: list[Message], search: bool) -> any:
     LOGGER.debug("Response %s", response)
     return result
 
-    async def _async_entry_update_listener(
-        self, hass: HomeAssistant, entry: ConfigEntry
-    ) -> None:
-        """Handle options update."""
+async def _async_entry_update_listener(
+    self, hass: HomeAssistant, entry: ConfigEntry
+) -> None:
+    """Handle options update."""
         # Reload as we update device info + entity name + supported features
-        await hass.config_entries.async_reload(entry.entry_id)
+    await hass.config_entries.async_reload(entry.entry_id)
