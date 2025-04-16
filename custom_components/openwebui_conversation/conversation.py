@@ -202,28 +202,37 @@ class OpenWebUIAgent(
             response=intent_response, conversation_id=conversation_id
         )
 
-    async def query(self, prompt: str, history: list[Message], search: bool) -> any:
-        """Process a sentence."""
-        model = self.entry.options.get(CONF_MODEL, DEFAULT_MODEL)
+async def query(self, prompt: str, history: list[Message], search: bool) -> any:
+    """Process a sentence."""
+    model = self.entry.options.get(CONF_MODEL, DEFAULT_MODEL)
 
-        LOGGER.debug("Prompt for %s: %s", model, prompt)
+    LOGGER.debug("Prompt for %s: %s", model, prompt)
 
-        message_list = [{"role": x.role, "content": x.message} for x in history]
-        message_list.append({"role": "user", "content": prompt})
+    # Inject a custom system prompt to personalize the assistant
+    system_prompt = (
+        "You are Echo, a helpful and slightly silly AI assistant speaking to Simeon. "
+        "You enjoy making responses fun, creative, and clear. You can crack jokes, use clever language, "
+        "and keep the vibe playful but smart. Respond conversationally and inject light humor where appropriate."
+    )
 
-        result = await self.client.async_generate(
-            {
-                "features": {"web_search": search},
-                "model": model,
-                "messages": message_list,
-                "params": {"keep_alive": "-1m"},
-                "stream": False,
-            }
-        )
+    # Start message list with the system prompt
+    message_list = [{"role": "system", "content": system_prompt}]
+    message_list += [{"role": x.role, "content": x.message} for x in history]
+    message_list.append({"role": "user", "content": prompt})
 
-        response: str = result["choices"][0]["message"]["content"]
-        LOGGER.debug("Response %s", response)
-        return result
+    result = await self.client.async_generate(
+        {
+            "features": {"web_search": search},
+            "model": model,
+            "messages": message_list,
+            "params": {"keep_alive": "-1m"},
+            "stream": False,
+        }
+    )
+
+    response: str = result["choices"][0]["message"]["content"]
+    LOGGER.debug("Response %s", response)
+    return result
 
     async def _async_entry_update_listener(
         self, hass: HomeAssistant, entry: ConfigEntry
