@@ -71,30 +71,21 @@ class OpenWebUIAgent(
         self.client = OpenWebUIApiClient(
             base_url=entry.data[CONF_BASE_URL],
             api_key=entry.data[CONF_API_KEY],
-            timeout=entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+            timeout=self.timeout,
             session=async_get_clientsession(hass),
             verify_ssl=entry.options.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
         )
         self.history: dict[str, list[Message]] = {}
-        self.search_enabled = entry.options.get(
-            CONF_SEARCH_ENABLED, DEFAULT_SEARCH_ENABLED
-        )
+        self.search_enabled = entry.options.get(CONF_SEARCH_ENABLED, DEFAULT_SEARCH_ENABLED)
         self.search_sentences = [
-            x
-            for x in entry.options.get(
-                CONF_SEARCH_SENTENCES, DEFAULT_SEARCH_SENTENCES
-            ).splitlines()
+            x for x in entry.options.get(CONF_SEARCH_SENTENCES, DEFAULT_SEARCH_SENTENCES).splitlines()
             if x.strip()
         ]
-        self.search_result_prefix = entry.options.get(
-            CONF_SEARCH_RESULT_PREFIX, DEFAULT_SEARCH_RESULT_PREFIX
-        )
+        self.search_result_prefix = entry.options.get(CONF_SEARCH_RESULT_PREFIX, DEFAULT_SEARCH_RESULT_PREFIX)
         self.lang = entry.options.get(CONF_LANGUAGE_CODE, DEFAULT_LANGUAGE_CODE).strip()
         self._attr_name = entry.title
         self._attr_unique_id = entry.entry_id
-        self.strip_markdown = entry.options.get(
-            CONF_STRIP_MARKDOWN, DEFAULT_STRIP_MARKDOWN
-        )
+        self.strip_markdown = entry.options.get(CONF_STRIP_MARKDOWN, DEFAULT_STRIP_MARKDOWN)
         self.markdown_parser = MarkdownIt(renderer_cls=RendererPlain)
 
     @property
@@ -136,31 +127,23 @@ class OpenWebUIAgent(
         should_search = False
 
         if self.search_enabled and len(self.search_sentences):
-            i = Intents.from_dict(
-                {
-                    "language": self.lang,
-                    "settings": {"ignore_whitespace": True},
-                    "intents": {
-                        DO_SEARCH_INTENT: {
-                            "data": [{"sentences": self.search_sentences}]
-                        }
-                    },
-                    "lists": {"query": {"wildcard": True}},
-                }
-            )
+            i = Intents.from_dict({
+                "language": self.lang,
+                "settings": {"ignore_whitespace": True},
+                "intents": {
+                    DO_SEARCH_INTENT: {
+                        "data": [{"sentences": self.search_sentences}]
+                    }
+                },
+                "lists": {"query": {"wildcard": True}},
+            })
             r = recognize(prompt, i)
-            if r is not None:
-                if (
-                    r.intent.name == DO_SEARCH_INTENT
-                    and r.entities.get("query", None) is not None
-                ):
-                    prompt = r.entities["query"].value
-                    should_search = True
+            if r is not None and r.intent.name == DO_SEARCH_INTENT and r.entities.get("query"):
+                prompt = r.entities["query"].value
+                should_search = True
 
         try:
-            response = await self.query(
-                prompt, conversation_history, should_search == True
-            )
+            response = await self.query(prompt, conversation_history, should_search)
         except (ApiCommError, ApiJsonError, ApiTimeoutError) as err:
             LOGGER.error("Error generating prompt: %s", err)
             intent_response = intent.IntentResponse(language=user_input.language)
@@ -187,6 +170,7 @@ class OpenWebUIAgent(
             response_data = self.markdown_parser.render(response_data)
         if should_search:
             response_data = f"{self.search_result_prefix} {response_data}"
+
         response_message = Message("assistant", response_data)
 
         conversation_history.append(user_message)
@@ -196,11 +180,9 @@ class OpenWebUIAgent(
         intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response_data)
 
-        if response_data.strip().endswith("?"):
-            LOGGER.debug("💬 Ending in question — enabling expect_response.")
-            intent_response.expect_response = True
-        else:
-            LOGGER.debug("💬 Not a question — follow-up not triggered.")
+        # 🧪 FORCE follow-up ON to test conversation continuation
+        intent_response.expect_response = True
+        LOGGER.warning("🧪 Forced expect_response = True for testing purposes")
 
         LOGGER.debug("🔁 Returning intent_response: %s", intent_response)
 
@@ -226,15 +208,13 @@ class OpenWebUIAgent(
         message_list += [{"role": x.role, "content": x.message} for x in history]
         message_list.append({"role": "user", "content": prompt})
 
-        result = await self.client.async_generate(
-            {
-                "features": {"web_search": search},
-                "model": model,
-                "messages": message_list,
-                "params": {"keep_alive": "-1m"},
-                "stream": False,
-            }
-        )
+        result = await self.client.async_generate({
+            "features": {"web_search": search},
+            "model": model,
+            "messages": message_list,
+            "params": {"keep_alive": "-1m"},
+            "stream": False,
+        })
 
         response: str = result["choices"][0]["message"]["content"]
         LOGGER.debug("Response %s", response)
