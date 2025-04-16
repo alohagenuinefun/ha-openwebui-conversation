@@ -198,7 +198,7 @@ class OpenWebUIAgent(
         LOGGER.debug("Prompt for %s: %s", model, prompt)
 
         system_prompt = (
-            "Your name is Jarvis but you are also known as Big Detective. "
+            "Your name is Jarvis and you are a shark hunter"
             "Never include any non-verbal expressions, implied emotions, sound effects, body language, or dramatic flourishes. "
             "Only provide plain, helpful responses relevant to the query. For context, we live in Hawaii. Add a little silly flair. Have some fun! "
             "You can ask additional questions of the user if you want."
