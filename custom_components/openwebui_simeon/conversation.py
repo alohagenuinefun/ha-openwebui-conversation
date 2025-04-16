@@ -195,8 +195,14 @@ class OpenWebUIAgent(
 
         intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response_data)
+
+        # Auto-listen if the assistant ends with a question
+        if response_data.strip().endswith("?"):
+            intent_response.response_type = intent.IntentResponseType.ASK
+
         return conversation.ConversationResult(
-            response=intent_response, conversation_id=conversation_id
+            response=intent_response,
+            conversation_id=conversation_id
         )
 
     async def query(self, prompt: str, history: list[Message], search: bool) -> any:
