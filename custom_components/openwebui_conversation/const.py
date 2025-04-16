@@ -5,7 +5,7 @@ from logging import Logger, getLogger
 LOGGER: Logger = getLogger(__package__)
 
 NAME = "OpenWebUI Conversation"
-DOMAIN = "openwebui_conversation"
+DOMAIN = "openwebui_simeon"
 
 DO_SEARCH_INTENT = "DoSearch"
 
