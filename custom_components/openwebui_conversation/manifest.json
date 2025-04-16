@@ -1,6 +1,6 @@
 {
-  "domain": "openwebui_conversation",
-  "name": "OpenWebUI Conversation",
+  "domain": "openwebui_simeon",
+  "name": "OpenWebUI Simeon",
   "codeowners": [
     "@TheRealPSV"
   ],
