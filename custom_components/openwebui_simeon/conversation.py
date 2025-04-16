@@ -11,9 +11,7 @@ from homeassistant.components import assist_pipeline, conversation
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import MATCH_ALL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import (
-    HomeAssistantError,
-)
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -196,48 +194,44 @@ class OpenWebUIAgent(
         self.history[conversation_id] = conversation_history
 
         intent_response = intent.IntentResponse(language=user_input.language)
-
         intent_response.async_set_speech(response_data)
         return conversation.ConversationResult(
             response=intent_response, conversation_id=conversation_id
         )
 
-async def query(self, prompt: str, history: list[Message], search: bool) -> any:
-    """Process a sentence."""
-    model = self.entry.options.get(CONF_MODEL, DEFAULT_MODEL)
+    async def query(self, prompt: str, history: list[Message], search: bool) -> any:
+        """Process a sentence."""
+        model = self.entry.options.get(CONF_MODEL, DEFAULT_MODEL)
 
-    LOGGER.debug("Prompt for %s: %s", model, prompt)
+        LOGGER.debug("Prompt for %s: %s", model, prompt)
 
-    # Inject a custom system prompt to personalize the assistant
-    system_prompt = (
-        "Your name is Jarvis but you are also known as Big Detective." 
-        "Never include any non-verbal expressions, implied emotions, sound effects, body language, or dramatic flourishes."
-        "Only provide plain, helpful responses relevant to the query. For context, we live in hawaii. Add a litle silly flair. Have some fun!"
-        "You can ask additional questions of the user if you want."
-    )
+        system_prompt = (
+            "Your name is Jarvis but you are also known as Big Detective. "
+            "Never include any non-verbal expressions, implied emotions, sound effects, body language, or dramatic flourishes. "
+            "Only provide plain, helpful responses relevant to the query. For context, we live in Hawaii. Add a little silly flair. Have some fun! "
+            "You can ask additional questions of the user if you want."
+        )
 
-    # Start message list with the system prompt
-    message_list = [{"role": "system", "content": system_prompt}]
-    message_list += [{"role": x.role, "content": x.message} for x in history]
-    message_list.append({"role": "user", "content": prompt})
+        message_list = [{"role": "system", "content": system_prompt}]
+        message_list += [{"role": x.role, "content": x.message} for x in history]
+        message_list.append({"role": "user", "content": prompt})
 
-    result = await self.client.async_generate(
-        {
-            "features": {"web_search": search},
-            "model": model,
-            "messages": message_list,
-            "params": {"keep_alive": "-1m"},
-            "stream": False,
-        }
-    )
+        result = await self.client.async_generate(
+            {
+                "features": {"web_search": search},
+                "model": model,
+                "messages": message_list,
+                "params": {"keep_alive": "-1m"},
+                "stream": False,
+            }
+        )
 
-    response: str = result["choices"][0]["message"]["content"]
-    LOGGER.debug("Response %s", response)
-    return result
+        response: str = result["choices"][0]["message"]["content"]
+        LOGGER.debug("Response %s", response)
+        return result
 
-async def _async_entry_update_listener(
-    self, hass: HomeAssistant, entry: ConfigEntry
-) -> None:
-    """Handle options update."""
-    # Reload as we update device info + entity name + supported features
-    await hass.config_entries.async_reload(entry.entry_id)
+    async def _async_entry_update_listener(
+        self, hass: HomeAssistant, entry: ConfigEntry
+    ) -> None:
+        """Handle options update."""
+        await hass.config_entries.async_reload(entry.entry_id)
