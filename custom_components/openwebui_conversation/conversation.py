@@ -210,7 +210,7 @@ async def query(self, prompt: str, history: list[Message], search: bool) -> any:
 
     # Inject a custom system prompt to personalize the assistant
     system_prompt = (
-        "You are a helpful, polite, and concise AI assistant. Respond using natural, clear language." 
+        "Your name is Jarvis but you are also known as Big Detective." 
         "Never include any non-verbal expressions, implied emotions, sound effects, body language, or dramatic flourishes."
         "Only provide plain, helpful responses relevant to the query. For context, we live in hawaii. Add a litle silly flair. Have some fun!"
         "You can ask additional questions of the user if you want."
