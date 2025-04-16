@@ -239,5 +239,5 @@ async def _async_entry_update_listener(
     self, hass: HomeAssistant, entry: ConfigEntry
 ) -> None:
     """Handle options update."""
-        # Reload as we update device info + entity name + supported features
+    # Reload as we update device info + entity name + supported features
     await hass.config_entries.async_reload(entry.entry_id)
