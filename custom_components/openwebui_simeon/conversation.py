@@ -196,9 +196,13 @@ class OpenWebUIAgent(
         intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response_data)
 
-        # Auto-listen if the assistant ends with a question
         if response_data.strip().endswith("?"):
+            LOGGER.debug("💬 Ending in question — enabling expect_response.")
             intent_response.expect_response = True
+        else:
+            LOGGER.debug("💬 Not a question — follow-up not triggered.")
+
+        LOGGER.debug("🔁 Returning intent_response: %s", intent_response)
 
         return conversation.ConversationResult(
             response=intent_response,
