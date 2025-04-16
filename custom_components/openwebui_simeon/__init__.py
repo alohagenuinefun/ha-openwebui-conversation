@@ -1,5 +1,5 @@
-"""Custom integration to integrate openwebui_conversation with Home Assistant.
-"""
+"""Custom integration to integrate openwebui_simeon with Home Assistant."""
+
 
 from __future__ import annotations
 
