@@ -1,7 +1,6 @@
 {
-    "name": "OpenWebUI Conversation",
-    "filename": "openwebui_conversation.zip",
-    "hide_default_branch": true,
-    "homeassistant": "2024.12.5",
-    "zip_release": true
+  "name": "OpenWebUI Simeon",
+  "domain": "openwebui_simeon",
+  "integration_type": "integration",
+  "codeowners": ["@alohagenuinefun"]
 }
