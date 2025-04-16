@@ -1,7 +1,6 @@
 """OpenWebUI conversation agent."""
 
 from __future__ import annotations
-
 from typing import Literal
 
 from hassil import recognize
@@ -71,30 +70,21 @@ class OpenWebUIAgent(
         self.client = OpenWebUIApiClient(
             base_url=entry.data[CONF_BASE_URL],
             api_key=entry.data[CONF_API_KEY],
-            timeout=entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+            timeout=self.timeout,
             session=async_get_clientsession(hass),
             verify_ssl=entry.options.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
         )
         self.history: dict[str, list[Message]] = {}
-        self.search_enabled = entry.options.get(
-            CONF_SEARCH_ENABLED, DEFAULT_SEARCH_ENABLED
-        )
+        self.search_enabled = entry.options.get(CONF_SEARCH_ENABLED, DEFAULT_SEARCH_ENABLED)
         self.search_sentences = [
-            x
-            for x in entry.options.get(
-                CONF_SEARCH_SENTENCES, DEFAULT_SEARCH_SENTENCES
-            ).splitlines()
+            x for x in entry.options.get(CONF_SEARCH_SENTENCES, DEFAULT_SEARCH_SENTENCES).splitlines()
             if x.strip()
         ]
-        self.search_result_prefix = entry.options.get(
-            CONF_SEARCH_RESULT_PREFIX, DEFAULT_SEARCH_RESULT_PREFIX
-        )
+        self.search_result_prefix = entry.options.get(CONF_SEARCH_RESULT_PREFIX, DEFAULT_SEARCH_RESULT_PREFIX)
         self.lang = entry.options.get(CONF_LANGUAGE_CODE, DEFAULT_LANGUAGE_CODE).strip()
         self._attr_name = entry.title
         self._attr_unique_id = entry.entry_id
-        self.strip_markdown = entry.options.get(
-            CONF_STRIP_MARKDOWN, DEFAULT_STRIP_MARKDOWN
-        )
+        self.strip_markdown = entry.options.get(CONF_STRIP_MARKDOWN, DEFAULT_STRIP_MARKDOWN)
         self.markdown_parser = MarkdownIt(renderer_cls=RendererPlain)
 
     @property
@@ -105,10 +95,16 @@ class OpenWebUIAgent(
     async def async_added_to_hass(self) -> None:
         """When entity is added to Home Assistant."""
         await super().async_added_to_hass()
-        assist_pipeline.async_migrate_engine(
-            self.hass, "conversation", self.entry.entry_id, self.entity_id
-        )
-        conversation.async_set_agent(self.hass, self.entry, self)
+
+        # Delay registration until entity_id is available
+        async def _register():
+            assist_pipeline.async_migrate_engine(
+                self.hass, "conversation", self.entry.entry_id, self.entity_id
+            )
+            conversation.async_set_agent(self.hass, self.entry, self)
+
+        self.hass.async_create_task(_register())
+
         self.entry.async_on_unload(
             self.entry.add_update_listener(self._async_entry_update_listener)
         )
@@ -122,7 +118,6 @@ class OpenWebUIAgent(
         self, user_input: conversation.ConversationInput
     ) -> conversation.ConversationResult:
         """Process a sentence."""
-
         if user_input.conversation_id in self.history:
             conversation_id = user_input.conversation_id
             conversation_history = self.history[conversation_id]
@@ -136,37 +131,26 @@ class OpenWebUIAgent(
         should_search = False
 
         if self.search_enabled and len(self.search_sentences):
-            i = Intents.from_dict(
-                {
-                    "language": self.lang,
-                    "settings": {"ignore_whitespace": True},
-                    "intents": {
-                        DO_SEARCH_INTENT: {
-                            "data": [{"sentences": self.search_sentences}]
-                        }
-                    },
-                    "lists": {"query": {"wildcard": True}},
-                }
-            )
+            i = Intents.from_dict({
+                "language": self.lang,
+                "settings": {"ignore_whitespace": True},
+                "intents": {
+                    DO_SEARCH_INTENT: {"data": [{"sentences": self.search_sentences}]}
+                },
+                "lists": {"query": {"wildcard": True}},
+            })
             r = recognize(prompt, i)
-            if r is not None:
-                if (
-                    r.intent.name == DO_SEARCH_INTENT
-                    and r.entities.get("query", None) is not None
-                ):
-                    prompt = r.entities["query"].value
-                    should_search = True
+            if r and r.intent.name == DO_SEARCH_INTENT and r.entities.get("query"):
+                prompt = r.entities["query"].value
+                should_search = True
 
         try:
-            response = await self.query(
-                prompt, conversation_history, should_search == True
-            )
+            response = await self.query(prompt, conversation_history, should_search)
         except (ApiCommError, ApiJsonError, ApiTimeoutError) as err:
             LOGGER.error("Error generating prompt: %s", err)
             intent_response = intent.IntentResponse(language=user_input.language)
             intent_response.async_set_error(
-                intent.IntentResponseErrorCode.UNKNOWN,
-                f"Something went wrong, {err}",
+                intent.IntentResponseErrorCode.UNKNOWN, f"Something went wrong, {err}"
             )
             return conversation.ConversationResult(
                 response=intent_response, conversation_id=conversation_id
@@ -187,10 +171,9 @@ class OpenWebUIAgent(
             response_data = self.markdown_parser.render(response_data)
         if should_search:
             response_data = f"{self.search_result_prefix} {response_data}"
-        response_message = Message("assistant", response_data)
 
-        conversation_history.append(user_message)
-        conversation_history.append(response_message)
+        response_message = Message("assistant", response_data)
+        conversation_history.extend([user_message, response_message])
         self.history[conversation_id] = conversation_history
 
         intent_response = intent.IntentResponse(language=user_input.language)
@@ -205,14 +188,12 @@ class OpenWebUIAgent(
         LOGGER.debug("🔁 Returning intent_response: %s", intent_response)
 
         return conversation.ConversationResult(
-            response=intent_response,
-            conversation_id=conversation_id
+            response=intent_response, conversation_id=conversation_id
         )
 
     async def query(self, prompt: str, history: list[Message], search: bool) -> any:
-        """Process a sentence."""
+        """Send the prompt to OpenWebUI and return the response."""
         model = self.entry.options.get(CONF_MODEL, DEFAULT_MODEL)
-
         LOGGER.debug("Prompt for %s: %s", model, prompt)
 
         system_prompt = (
@@ -236,8 +217,7 @@ class OpenWebUIAgent(
             }
         )
 
-        response: str = result["choices"][0]["message"]["content"]
-        LOGGER.debug("Response %s", response)
+        LOGGER.debug("Response %s", result["choices"][0]["message"]["content"])
         return result
 
     async def _async_entry_update_listener(
